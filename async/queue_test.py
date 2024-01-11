@@ -1,12 +1,14 @@
+# RAII 를 생각하며 객체의 생성 소멸을 고려하며 만들어 볼것.
 import asyncio
-import random
-from enum import Enum
+from asyncio import Task
 from collections import defaultdict, deque
+from enum import Enum
+import random
 import functools
 
-# 현재 수행되고 있는 큐 리스트
-TASK_QUEUE: deque[asyncio.Future[None]] = deque()
-STATUS_DICT = defaultdict(str)
+TASK_QUEUE: deque[asyncio.Future[int]] = deque()
+STATUS_DICT = defaultdict(int)
+RESULT_DICT = defaultdict(int)
 
 
 class Status(Enum):
@@ -15,42 +17,56 @@ class Status(Enum):
     SUCCESS = 3
 
 
-# 랜덤으로 몇초간 delay 주는 task
-async def task():
+async def task(name: str) -> int:
     delay = random.randint(1, 5)
-    await asyncio.sleep(delay)
+
+    print(f"[{name}] Started")
+
+    for sec in range(delay):
+        print(f"<{name}>[{sec}s / {delay}s]")
+        await asyncio.sleep(1)
+
+    return delay
 
 
-async def task_run(idx):
-    fut = asyncio.create_task(task())
-    fut.set_name(f"task-{idx}")
-    TASK_QUEUE.append(fut)
-    # task 종료 시, set_status 함수 호출
-    fut.add_done_callback(functools.partial(set_status, fut.get_name()))
+# 순수 task 만 실행 후, task 반환 (future 상속)
+async def task_runner(name) -> Task:
+    return asyncio.create_task(task(name))
+
+
+def set_status(future_name, future: asyncio.Future[int]):
+    if future.cancelled():
+        print(f"[{future_name}] is cancelled.")
+        STATUS_DICT[future_name] = Status.CANCELLED.value
+        RESULT_DICT[future_name] = -1
+
+    else:
+        print(f"[{future_name}] is successed")
+        STATUS_DICT[future_name] = Status.SUCCESS.value
+        RESULT_DICT[future_name] = future.result()
+
+
+"""
+task 생성 함수 호출, 큐 삽입 및 관리 모두 여기 메소드에서 관리
+- 큐 소유권 가지고 있기 -> 타 함수에 소유권 왔다갔다 별로 (Rust나 C 였으면 지옥)
+"""
 
 
 async def main():
     for idx in range(3):
-        print(f"task-{idx} is started")
-        await task_run(idx)
-        # future 객체 생성 필요 시, get_event_loop() 받아서 생성
-        # 그래서 계속 cancel 상태로 반환해버림
-        # 해결 방법을 모르겠음 ㅠㅠ
+        name = f"task-{idx}"
+
+        future = await task_runner(name)
+        future.set_name(name)
+        future.add_done_callback(functools.partial(set_status, name))
+
+        TASK_QUEUE.append(future)
+
     results = await asyncio.gather(*TASK_QUEUE)
-    print(f"All Task is completed. {results}")
+    print(f"All task is finished. {results}")
     print(f"Status dict : {STATUS_DICT}")
-
-
-def set_status(
-    future_name,
-    future: asyncio.Future[None],
-):
-    if future.cancelled():
-        print(f"Task was cancelled. {future_name}")
-        STATUS_DICT[future_name] = Status.CANCELLED.value
-    else:
-        print(f"Task completed successfully.{future_name}")
-        STATUS_DICT[future_name] = Status.SUCCESS.value
+    print(f"Result dict : {RESULT_DICT}")
 
 
 asyncio.run(main())
+
