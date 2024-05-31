@@ -3,6 +3,7 @@
 ### Requirements
 
 - Check AWS_ACCESS_KEY_ID , AWS_SECRET_ACCESS_KEY
+
 https://registry.terraform.io/providers/hashicorp/aws/latest/docs?product_intent=terraform#environment-variables
 
 - Install terraform
