@@ -16,7 +16,7 @@ def dag_success_alert(context):
 # callback List 로 여러 callback 함수 정의 가능
 # 예) on_failure_callback = [func1, func2 . .]
 with DAG(
-    dag_id="example_callback",
+    dag_id="callback_dag",
     schedule=None,
     start_date=pendulum.datetime(2024, 7, 10, tz="UTC"),
     dagrun_timeout=datetime.timedelta(minutes=60),
@@ -29,4 +29,6 @@ with DAG(
     task1 = EmptyOperator(task_id="task1")
     task2 = EmptyOperator(task_id="task2")
     task3 = EmptyOperator(task_id="task3", on_success_callback=[dag_success_alert])
-    task1 >> task2 >> task3
+    task4 = EmptyOperator(task_id="test4")
+
+    task1 >> [task2, task4] >> task3
