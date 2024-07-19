@@ -1,10 +1,11 @@
 import pendulum
 import logging
+import datetime
 
+from lib import *
 from airflow.hooks.base import BaseHook
 from airflow.models.connection import Connection
 from airflow.decorators import dag, task
-from airflow.operators.python_operator import PythonOperator
 
 
 logger = logging.getLogger(__name__)
@@ -20,16 +21,16 @@ connection 정보                 : Connection 저장
 
 # task decorator -> python Operator 호출 TaskAPI
 @task
-def _load_config(conn_id, **context):
-    hook = Connection.get_connection_from_secrets(conn_id)
-    print(f"Hook Infomation : {hook}")
-    logger.info("Info log ****************")
+def load_es_config():
+    es_client = load_es_config()
+    logger.info(f"ES Connection : {es_client}")
+    print({{op_kwargs}})
 
 
 @task
-def _load_base_hook(conn_id, **context):
-    base_hook = BaseHook.get_connection(conn_id)
-    print(f"Base Hook Infomation : {base_hook}")
+def load_hdfs_config():
+    hdfs_client = load_hdfs_config()
+    logger.info(f"HDFS Client : {hdfs_client}")
 
 
 @dag(
@@ -40,7 +41,8 @@ def _load_base_hook(conn_id, **context):
     tags=["config", "base"],
 )
 def load_config():
-    _load_config("test_file") >> _load_base_hook("test_file")
+
+    [load_es_config(), load_hdfs_config()]
 
 
 dag = load_config()
