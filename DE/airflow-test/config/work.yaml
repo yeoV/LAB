@@ -1,0 +1,5 @@
+task_name: work
+sub_task_type: qna
+path_config:
+  hancom_conv_hdfs_path: /data/qna
+  hdfs_conv_path : /data/org
