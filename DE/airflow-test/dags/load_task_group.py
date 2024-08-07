@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 import os
 from typing import Dict, Union
-from sub_task import sub_task
+from sub_tasks import sub_task
 from config.work_config import Work
 
 from airflow.models.connection import Connection
@@ -12,8 +10,8 @@ AIRFLOW_HOME = os.getenv("AIRFLOW_HOME")
 CONFIG_FILE = f"{AIRFLOW_HOME}/config/work.yaml"
 
 
-@dag(dag_id="work_dag")
-def run_dag():
+@dag(dag_id="load_task_group")
+def load_task_group():
 
     # Pydantic config load
     @task
@@ -33,7 +31,7 @@ def run_dag():
     def connection_uri():
         conn = Connection.get_connection_from_secrets("elasticsearch_default")
         test = conn.get_uri()
-        print(test)
+        print(f"ES Connection info {test}")
 
     config = load_config()
     use_config_task = use_config(config)
@@ -41,4 +39,4 @@ def run_dag():
     sub_task() >> config >> use_config_task >> connection_uri()
 
 
-run_dag()
+load_task_group()

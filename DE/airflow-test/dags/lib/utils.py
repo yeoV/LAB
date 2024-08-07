@@ -20,7 +20,7 @@ CONNECTIONS = {"ES": "elasticsearch_default", "HDFS": "hdfs_default"}
 
 
 # Load config task
-def load_common_config(config_path: str) -> Dict[str, str]:
+def load_config(config_path: str) -> Dict[str, str]:
     try:
         with open(config_path) as f:
             config = yaml.safe_load(f)
@@ -37,10 +37,15 @@ def get_current_date():
 def load_es_config():
     conn = Connection.get_connection_from_secrets(CONNECTIONS["ES"])
     return Elasticsearch(
-        conn.get_uri(), api_key=conn.get_password(), verify_certs=False
+        "https" + conn.get_uri()[4:], api_key=conn.get_password(), verify_certs=False
     )
 
 
 def load_hdfs_confug():
     conn = Connection.get_connection_from_secrets(CONNECTIONS["HDFS"])
     return InsecureClient(conn.get_uri(), conn.login)
+
+
+if __name__ == "__main__":
+    es_client = load_es_config()
+    print(es_client.transport.hosts)
