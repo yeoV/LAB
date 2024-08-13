@@ -1,7 +1,9 @@
 import yaml
 import logging
 import datetime
+import json
 from typing import Dict
+from jinja2 import Template, Environment, FileSystemLoader
 
 from hdfs import InsecureClient
 from elasticsearch import Elasticsearch
@@ -30,22 +32,36 @@ def load_config(config_path: str) -> Dict[str, str]:
         raise e
 
 
+# Jinja template Rendering
+def rendering_config(config_path, date):
+    with open(config_path) as f:
+        template_content: str = f.read()
+    # Environment class 로 만듬
+    template = Template(template_content)
+    # 변수로 넣을 값 load
+    pre_rendered_config = yaml.safe_load(template_content)
+    # template 에 변수값 rendereing
+    rendered_config: str = template.render(pre_rendered_config, date=date)
+    return yaml.safe_load(rendered_config)
+
+
 def get_current_date():
-    return datetime.now().strftime("%Y%m%d")
+    return datetime.datetime.now().strftime("%Y%m%d")
 
 
 def load_es_config():
     conn = Connection.get_connection_from_secrets(CONNECTIONS["ES"])
-    return Elasticsearch(
-        "https" + conn.get_uri()[4:], api_key=conn.get_password(), verify_certs=False
-    )
+    # http -> https
+    secure_uri = "https" + conn.get_uri()[4:]
+    return Elasticsearch(secure_uri, api_key=conn.get_password(), verify_certs=False)
 
 
-def load_hdfs_confug():
+def load_hdfs_config():
     conn = Connection.get_connection_from_secrets(CONNECTIONS["HDFS"])
     return InsecureClient(conn.get_uri(), conn.login)
 
 
 if __name__ == "__main__":
-    es_client = load_es_config()
-    print(es_client.transport.hosts)
+    temp = rendering_config("config/work.yaml", get_current_date())
+    print(temp)
+    # test_rendering("config/work.yaml", get_current_date())

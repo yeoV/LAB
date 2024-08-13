@@ -16,14 +16,14 @@ def dag_success_alert(context):
 # callback List 로 여러 callback 함수 정의 가능
 # 예) on_failure_callback = [func1, func2 . .]
 with DAG(
-    dag_id="callback_dag",
+    dag_id="callback-dag",
     schedule=None,
     start_date=pendulum.datetime(2024, 7, 10, tz="UTC"),
     dagrun_timeout=datetime.timedelta(minutes=60),
     catchup=False,
     on_success_callback=None,
     on_failure_callback=task_failure_alert,
-    tags=["example"],
+    tags=["callback"],
 ):
     print(pendulum.timezones)
     task1 = EmptyOperator(task_id="task1")

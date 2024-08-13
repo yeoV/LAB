@@ -1,0 +1,6 @@
+.airflow
+**/__pycache__
+logs/*
+.tool-versions
+TODO
+.pytest_cache/*

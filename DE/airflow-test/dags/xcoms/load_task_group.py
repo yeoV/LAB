@@ -1,6 +1,6 @@
 import os
 from typing import Dict, Union
-from sub_tasks import sub_task
+from dags.subtask_group.subtask_dummy import sub_task
 from config.work_config import Work
 
 from airflow.models.connection import Connection
@@ -10,7 +10,7 @@ AIRFLOW_HOME = os.getenv("AIRFLOW_HOME")
 CONFIG_FILE = f"{AIRFLOW_HOME}/config/work.yaml"
 
 
-@dag(dag_id="load_task_group")
+@dag(dag_id="load_task_group", tags=["xcoms"])
 def load_task_group():
 
     # Pydantic config load
@@ -29,9 +29,9 @@ def load_task_group():
 
     @task
     def connection_uri():
-        conn = Connection.get_connection_from_secrets("elasticsearch_default")
-        test = conn.get_uri()
-        print(f"ES Connection info {test}")
+        conn = Connection.get_connection_from_secrets("hdfs_default")
+        print(f"ES Connection info {conn.as_json()}")
+        print(f"ES Connection info {conn.get_uri()}")
 
     config = load_config()
     use_config_task = use_config(config)

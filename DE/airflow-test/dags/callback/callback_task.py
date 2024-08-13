@@ -28,10 +28,10 @@ def _failure_task():
 
 
 @dag(
-    dag_id="task_callback",
+    dag_id="callback-task",
     schedule=None,
     start_date=pendulum.datetime(2024, 7, 15, tz=KST),
-    tags=["task", "callback"],
+    tags=["callback"],
     # on_success_callback=task_success_alert,
     # on_failure_callback=task_failure_alert,
 )
