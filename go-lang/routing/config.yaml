@@ -1,0 +1,9 @@
+gateway:
+  listenAddr: localhost:8080
+  routes:
+    - name: faker
+      context: /fake-data/3
+      target : http://localhost:9000
+    - name: google
+      context: 
+      target : https://www.google.com
