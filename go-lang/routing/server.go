@@ -9,7 +9,8 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/gorilla/mux"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"gopkg.in/yaml.v3"
 )
 
@@ -65,24 +66,23 @@ func CreateReverseProxy(config *Config, proxies Proxies) error{
 	return nil
 }
 
-func ProxyRequestHandler(proxies Proxies) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request){
-		vars := mux.Vars(r)
-		serverName := vars["param"]
-
-		server, ok := proxies[serverName]
+func ProxyRequestHandler(proxies Proxies) echo.HandlerFunc{
+	return func(c echo.Context) error {
+		serverName := c.Param("param")
+		proxy, ok := proxies[serverName]
 		if !ok{
-			http.Error(w, fmt.Sprintf("Invalid server name: %s", serverName), http.StatusBadRequest)
-			return
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("invalid server name (URL param). %s", serverName))
 		}
-		// Logging inbound info
-		log.Printf("Incoming Request URL: %s, Host: %s\n", r.URL, r.Host)
-		server.ServeHTTP(w, r)
-		log.Printf("Successfully proxied request to server: %s, Target URL: %s", serverName, r.URL)
+		log.Printf("Incoming Request URL: %s\n", c.Request().RequestURI)
 
+		proxy.ServeHTTP(c.Response(), c.Request())
+		
+		log.Printf("Successfully proxied request to server: %s, Target URL: %s", serverName, c.Request().URL)
+
+
+		return nil
 	}
 }
-
 
 type Proxies map[string]*httputil.ReverseProxy
 func main() {
@@ -97,12 +97,13 @@ func main() {
 	if err := CreateReverseProxy(&config, proxies); err != nil{
 		log.Fatal(err)
 	}
-	r := mux.NewRouter()
-	log.Printf("Routing Server Starting . . .")
-	r.HandleFunc("/{param:.*}", ProxyRequestHandler(proxies))
+	
+	e := echo.New()
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
 
-	if err := http.ListenAndServe(":8080", r); err != nil{
-		log.Fatal("Server failed.", err)
-	}
+	e.GET("/:param", ProxyRequestHandler(proxies))
+	
+	e.Logger.Fatal(e.Start(":8080"))
 	
 }
