@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -44,22 +45,43 @@ func LoadConfig(configPath string, config *Config) error{
 // Loaded backend urls convert to reverseproxy url
 func CreateReverseProxy(config *Config, proxies Proxies) error{
 	for _, route := range config.Gateway.Routes{
-		url, err := url.Parse(route.Target)
+		target, err := url.Parse(route.Target)
 		if err != nil{
-			return fmt.Errorf("can't parse url: %w", err)
+			return errors.New("can't parse url")
 		}
-		// TODO : ReverseProxy 뭔가 URL setting이 문제인듯
-		proxies[route.Name] = httputil.NewSingleHostReverseProxy(url)
+		// https://pkg.go.dev/net/http/httputil#NewSingleHostReverseProxy
+		proxy := &httputil.ReverseProxy{
+			Rewrite: func(pr *httputil.ProxyRequest) {
+				pr.SetURL(target)
+				pr.Out.URL.Path = route.Context
+				pr.SetXForwarded()
+				
+				// Logging outbound info
+				log.Printf("Outbound URL: %s, Host: %s\n", pr.Out.URL, pr.Out.Host)
+			},
+		}
+		proxies[route.Name] = proxy
 	}
 	return nil
 }
 
 func ProxyRequestHandler(proxies Proxies) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request){
-		// TODO : Request URL
+		vars := mux.Vars(r)
+		serverName := vars["param"]
+
+		server, ok := proxies[serverName]
+		if !ok{
+			http.Error(w, fmt.Sprintf("Invalid server name: %s", serverName), http.StatusBadRequest)
+			return
+		}
+		// Logging inbound info
+		log.Printf("Incoming Request URL: %s, Host: %s\n", r.URL, r.Host)
+		server.ServeHTTP(w, r)
+		log.Printf("Successfully proxied request to server: %s, Target URL: %s", serverName, r.URL)
+
 	}
 }
-
 
 
 type Proxies map[string]*httputil.ReverseProxy
@@ -75,9 +97,8 @@ func main() {
 	if err := CreateReverseProxy(&config, proxies); err != nil{
 		log.Fatal(err)
 	}
-	fmt.Println(proxies)
 	r := mux.NewRouter()
-
+	log.Printf("Routing Server Starting . . .")
 	r.HandleFunc("/{param:.*}", ProxyRequestHandler(proxies))
 
 	if err := http.ListenAndServe(":8080", r); err != nil{
