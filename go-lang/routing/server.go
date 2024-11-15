@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -8,6 +9,9 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -61,6 +65,12 @@ func CreateReverseProxy(config *Config, proxies Proxies) error{
 				log.Printf("Outbound URL: %s, Host: %s\n", pr.Out.URL, pr.Out.Host)
 			},
 		}
+
+		// proxy error handler
+		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+				log.Printf("Proxy error : %v", err)
+				http.Error(w, fmt.Sprintln("Can't connect server."), http.StatusBadGateway)
+		}
 		proxies[route.Name] = proxy
 	}
 	return nil
@@ -76,6 +86,7 @@ func ProxyRequestHandler(proxies Proxies) echo.HandlerFunc{
 		log.Printf("Incoming Request URL: %s\n", c.Request().RequestURI)
 
 		proxy.ServeHTTP(c.Response(), c.Request())
+		
 		
 		log.Printf("Successfully proxied request to server: %s, Target URL: %s", serverName, c.Request().URL)
 
@@ -103,7 +114,25 @@ func main() {
 	e.Use(middleware.Recover())
 
 	e.GET("/:param", ProxyRequestHandler(proxies))
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	// Start
+	go func(){
+		if err := e.Start(":8080"); err != nil && err != http.ErrServerClosed{
+			e.Logger.Fatal("shutting down the server ")
+		}
+	}()
+	// graceful shutdown
+
+	<-ctx.Done()
+	e.Logger.Info("Shutdown signal received")
 	
-	e.Logger.Fatal(e.Start(":8080"))
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5* time.Second)
+	defer cancel()
+	if err := e.Shutdown(shutdownCtx); err != nil{
+		e.Logger.Fatal("Failed to gracefully shutdown")
+	}
+	e.Logger.Info("Server gracefully stopped")
 	
 }
